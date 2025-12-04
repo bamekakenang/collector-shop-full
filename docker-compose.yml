@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: collector-backend
+    ports:
+      - "4004:4003"
+    environment:
+      DATABASE_URL: "file:./dev.db"
+      JWT_SECRET: "dev_change_me"
+      STRIPE_SECRET_KEY: "sk_test_xxx"
+      FRONTEND_URL: "http://localhost:5173"
+    volumes:
+      - ./backend/prisma:/app/prisma
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:4004
+    container_name: collector-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
