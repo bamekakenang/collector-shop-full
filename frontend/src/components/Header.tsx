@@ -57,19 +57,23 @@ export function Header({
         </div>
 
         <nav className="hidden lg:flex items-center gap-6">
-          <button
-            onClick={() => handleNavigate('home')}
-            className={`text-sm transition-colors ${currentPage === 'home' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Accueil
-          </button>
-          <button
-            onClick={() => handleNavigate('catalog')}
-            className={`text-sm transition-colors ${currentPage === 'catalog' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Catalogue
-          </button>
-          {user && (
+          {user?.role !== 'ADMIN' && (
+            <>
+              <button
+                onClick={() => handleNavigate('home')}
+                className={`text-sm transition-colors ${currentPage === 'home' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Accueil
+              </button>
+              <button
+                onClick={() => handleNavigate('catalog')}
+                className={`text-sm transition-colors ${currentPage === 'catalog' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Catalogue
+              </button>
+            </>
+          )}
+          {user && user.role !== 'ADMIN' && (
             <button
               onClick={() => handleNavigate('dashboard')}
               className={`flex items-center gap-1 text-sm transition-colors ${currentPage === 'dashboard' ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`}
@@ -90,12 +94,14 @@ export function Header({
         </nav>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={onAddProduct}
-            className="hidden md:inline-flex items-center px-3 py-2 rounded-full bg-gray-900 text-white text-xs hover:bg-black transition-colors"
-          >
-            Vendre un article
-          </button>
+{(!user || user.role === 'SELLER') && (
+            <button
+              onClick={onAddProduct}
+              className="hidden md:inline-flex items-center px-3 py-2 rounded-full bg-gray-900 text-white text-xs hover:bg-black transition-colors"
+            >
+              Vendre un article
+            </button>
+          )}
 
           <button
             onClick={onOpenCart}
@@ -113,7 +119,15 @@ export function Header({
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex flex-col items-end">
                 <span className="text-xs text-gray-500">Connecté en tant que</span>
-                <span className="text-sm text-gray-900 font-medium">{user.name}</span>
+                <span className="text-sm text-gray-900 font-medium flex items-center gap-2">
+                  {user.name}
+                  {user.role === 'SELLER' && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700">Compte vendeur</span>
+                  )}
+                  {user.role === 'ADMIN' && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">Admin</span>
+                  )}
+                </span>
               </div>
               <button
                 onClick={onLogout}
@@ -145,19 +159,23 @@ export function Header({
 
           {isMobileMenuOpen && (
         <div className="lg:hidden border-t border-gray-200 bg-white px-4 py-3 space-y-2">
-          <button
-            onClick={() => handleNavigate('home')}
-            className="block w-full text-left py-2 text-gray-700"
-          >
-            Accueil
-          </button>
-          <button
-            onClick={() => handleNavigate('catalog')}
-            className="block w-full text-left py-2 text-gray-700"
-          >
-            Catalogue
-          </button>
-          {user && (
+          {user?.role !== 'ADMIN' && (
+            <>
+              <button
+                onClick={() => handleNavigate('home')}
+                className="block w-full text-left py-2 text-gray-700"
+              >
+                Accueil
+              </button>
+              <button
+                onClick={() => handleNavigate('catalog')}
+                className="block w-full text-left py-2 text-gray-700"
+              >
+                Catalogue
+              </button>
+            </>
+          )}
+          {user && user.role !== 'ADMIN' && (
             <button
               onClick={() => handleNavigate('dashboard')}
               className="block w-full text-left py-2 text-gray-700"
@@ -173,12 +191,14 @@ export function Header({
               Admin
             </button>
           )}
-          <button
-            onClick={onAddProduct}
-            className="block w-full text-left py-2 text-gray-700"
-          >
-            Vendre un article
-          </button>
+{(!user || user.role === 'SELLER') && (
+            <button
+              onClick={onAddProduct}
+              className="block w-full text-left py-2 text-gray-700"
+            >
+              Vendre un article
+            </button>
+          )}
         </div>
       )}
     </header>

@@ -358,6 +358,160 @@ app.post('/api/admin/products/:id/reject', authMiddleware, requireRole('ADMIN'),
   }
 });
 
+// Seller request workflow
+// Create or re-open a seller request for current user
+app.post('/api/users/me/request-seller', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const message = req.body?.message || null;
+    const existing = await prisma.sellerRequest.findUnique({ where: { userId } });
+    const reqRecord = existing
+      ? await prisma.sellerRequest.update({ where: { userId }, data: { status: 'pending', message } })
+      : await prisma.sellerRequest.create({ data: { userId, status: 'pending', message } });
+    return res.status(201).json(reqRecord);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible d'enregistrer la demande vendeur" });
+  }
+});
+
+// Get current user's seller request
+app.get('/api/users/me/seller-request', authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const reqRecord = await prisma.sellerRequest.findUnique({ where: { userId } });
+    return res.json(reqRecord || null);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de charger la demande vendeur" });
+  }
+});
+
+// Admin: list seller requests (pending by default)
+app.get('/api/admin/seller-requests', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const status = (req.query.status || 'pending').toString();
+    const list = await prisma.sellerRequest.findMany({
+      where: status ? { status } : undefined,
+      orderBy: { createdAt: 'desc' },
+      include: { user: true },
+    });
+    return res.json(list);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de lister les demandes vendeur" });
+  }
+});
+
+// Admin: approve request
+app.post('/api/admin/seller-requests/:id/approve', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const request = await prisma.sellerRequest.findUnique({ where: { id } });
+    if (!request) return res.status(404).json({ error: 'Demande introuvable' });
+    await prisma.$transaction([
+      prisma.sellerRequest.update({ where: { id }, data: { status: 'approved' } }),
+      prisma.user.update({ where: { id: request.userId }, data: { role: 'SELLER' } }),
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible d'approuver la demande" });
+  }
+});
+
+// Admin: reject request
+app.post('/api/admin/seller-requests/:id/reject', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const message = req.body?.message || null;
+    const request = await prisma.sellerRequest.findUnique({ where: { id } });
+    if (!request) return res.status(404).json({ error: 'Demande introuvable' });
+    await prisma.sellerRequest.update({ where: { id }, data: { status: 'rejected', message } });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de rejeter la demande" });
+  }
+});
+
+// Admin: list users and update role
+app.get('/api/admin/users', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const role = req.query.role ? String(req.query.role) : undefined;
+    const q = req.query.q ? String(req.query.q) : undefined;
+    const page = Number(req.query.page || 1);
+    const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize || 10)));
+
+    const where = {
+      ...(role ? { role } : {}),
+      ...(q ? { OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } }
+      ] } : {}),
+    };
+
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({ where, orderBy: { name: 'asc' }, skip: (page - 1) * pageSize, take: pageSize })
+    ]);
+
+    return res.json({
+      total,
+      page,
+      pageSize,
+      items: users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active })),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de lister les utilisateurs" });
+  }
+});
+
+app.post('/api/admin/users/:id/active', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const active = Boolean(req.body?.active);
+    const user = await prisma.user.update({ where: { id }, data: { active } });
+    return res.json({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de mettre à jour l'état du compte" });
+  }
+});
+
+app.post('/api/admin/users/:id/role', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const id = req.params.id;
+    const role = req.body?.role;
+    if (!['BUYER', 'SELLER', 'ADMIN'].includes(role)) {
+      return res.status(400).json({ error: 'Rôle invalide' });
+    }
+    const user = await prisma.user.update({ where: { id }, data: { role } });
+    return res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Impossible de mettre à jour le rôle" });
+  }
+});
+
+// Admin: delete product
+app.delete('/api/admin/products/:id', authMiddleware, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.product.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Produit non trouvé' });
+    }
+
+    await prisma.product.delete({ where: { id } });
+    return res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur lors de la suppression de l'article" });
+  }
+});
+
 const PORT = process.env.PORT || 4003;
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);

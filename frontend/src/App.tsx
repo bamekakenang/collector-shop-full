@@ -11,7 +11,7 @@ import { ChatWidget } from './components/ChatWidget';
 import { CartDrawer } from './components/CartDrawer';
 import { AddProductModal, ProductFormData } from './components/AddProductModal';
 import { Product } from './data/mockData';
-import { createProduct, loginUser, registerUser } from './api/client';
+import { createProduct, loginUser, registerUser, createSellerRequest } from './api/client';
 
 export type UserRole = 'BUYER' | 'SELLER' | 'ADMIN';
 
@@ -55,8 +55,8 @@ function App() {
     setShowLoginModal(false);
   };
 
-  const handleRegister = async (name: string, email: string, password: string) => {
-    const { user: apiUser, token } = await registerUser({ name, email, password });
+  const handleRegister = async (name: string, email: string, password: string, role: 'BUYER' | 'SELLER') => {
+    const { user: apiUser, token } = await registerUser({ name, email, password, role });
     setUser({
       id: apiUser.id,
       name: apiUser.name,
@@ -141,6 +141,22 @@ function App() {
       });
   };
 
+  // Forcer l'accès admin uniquement quand connecté en ADMIN
+  if (user?.role === 'ADMIN' && currentPage !== 'admin') {
+    setCurrentPage('admin');
+  }
+
+  const handleUpgradeToSeller = async () => {
+    if (!user?.token) { alert('Veuillez vous reconnecter'); return; }
+    try {
+      await createSellerRequest(user.token);
+      alert("Demande envoyée. Un administrateur doit l'approuver.");
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Impossible d'envoyer la demande");
+    }
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
@@ -174,6 +190,7 @@ function App() {
             onProductClick={handleProductClick}
             onOpenChat={() => setShowChat(true)}
             onAddProduct={() => setShowAddProduct(true)}
+            onUpgradeToSeller={handleUpgradeToSeller}
           />
         );
       case 'admin':

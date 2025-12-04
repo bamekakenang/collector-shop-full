@@ -1,5 +1,6 @@
 import { Star, MapPin } from 'lucide-react';
 import type { Product } from '../data/mockData';
+import { getImageUrl } from '../lib/getImageUrl';
 
 interface ProductCardProps {
   product: Product;
@@ -16,7 +17,7 @@ export function ProductCard({ product, onClick, showRecommendedBadge }: ProductC
       <div className="relative">
         <div className="aspect-[4/3] overflow-hidden">
           <img
-            src={product.image}
+            src={getImageUrl(product.image)}
             alt={product.title}
             className="w-full h-full object-cover"
           />

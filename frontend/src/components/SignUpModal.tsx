@@ -3,13 +3,14 @@ import { X } from 'lucide-react';
 
 interface SignUpModalProps {
   onClose: () => void;
-  onRegister: (name: string, email: string, password: string) => Promise<void> | void;
+  onRegister: (name: string, email: string, password: string, role: 'BUYER' | 'SELLER') => Promise<void> | void;
 }
 
 export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'BUYER' | 'SELLER'>('BUYER');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +19,7 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
     setLoading(true);
     setError(null);
     try {
-      await onRegister(name, email, password);
+      await onRegister(name, email, password, role);
       onClose();
     } catch (err: any) {
       setError(err?.message || "Erreur lors de l'inscription");
@@ -70,6 +71,20 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
             />
           </div>
 
+          <div>
+            <span className="block text-gray-900 mb-1 text-sm">Type de compte</span>
+            <div className="flex items-center gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="role" value="BUYER" checked={role==='BUYER'} onChange={() => setRole('BUYER')} />
+                Acheteur
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="role" value="SELLER" checked={role==='SELLER'} onChange={() => setRole('SELLER')} />
+                Vendeur
+              </label>
+            </div>
+          </div>
+
           {error && (
             <p className="text-red-600 text-xs mb-1">{error}</p>
           )}
@@ -83,7 +98,7 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
           </button>
 
           <p className="text-gray-500 text-xs mt-2">
-            Un compte est créé avec le rôle acheteur par défaut. Vous pourrez demander un rôle vendeur ou admin plus tard.
+            Vous pouvez vous inscrire en tant qu’acheteur ou vendeur. Les vendeurs peuvent publier des articles.
           </p>
         </form>
       </div>

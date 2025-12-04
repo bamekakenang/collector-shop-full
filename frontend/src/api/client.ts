@@ -1,13 +1,106 @@
 import type { Product } from '../data/mockData';
 import type { ProductFormData } from '../components/AddProductModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: 'BUYER' | 'SELLER' | 'ADMIN' | string;
+}
+
+export interface AdminUserDTO { id: string; name: string; email: string; role: 'BUYER' | 'SELLER' | 'ADMIN' | string; active?: boolean }
+export async function adminListUsers(token: string, role?: string, q?: string, page: number = 1, pageSize: number = 10): Promise<{ total: number; page: number; pageSize: number; items: AdminUserDTO[] }> {
+  const params = new URLSearchParams();
+  if (role) params.set('role', role);
+  if (q) params.set('q', q);
+  if (page) params.set('page', String(page));
+  if (pageSize) params.set('pageSize', String(pageSize));
+  const res = await fetch(`${API_URL}/api/admin/users?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error("Impossible de lister les utilisateurs");
+  return res.json();
+}
+export async function adminSetUserRole(token: string, id: string, role: 'BUYER' | 'SELLER' | 'ADMIN'): Promise<AdminUserDTO> {
+  const res = await fetch(`${API_URL}/api/admin/users/${id}/role`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || "Impossible de mettre à jour le rôle");
+  }
+  return res.json();
+}
+
+export async function adminSetUserActive(token: string, id: string, active: boolean): Promise<AdminUserDTO> {
+  const res = await fetch(`${API_URL}/api/admin/users/${id}/active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ active }),
+  });
+  if (!res.ok) throw new Error("Impossible de mettre à jour l'état du compte");
+  return res.json();
+}
+
+export interface SellerRequest {
+  id: string;
+  userId: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  message?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function createSellerRequest(token: string, message?: string): Promise<SellerRequest> {
+  const res = await fetch(`${API_URL}/api/users/me/request-seller`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Impossible de créer la demande vendeur');
+  }
+  return res.json();
+}
+
+export async function listSellerRequests(token: string, status: string = 'pending'): Promise<SellerRequest[]> {
+  const res = await fetch(`${API_URL}/api/admin/seller-requests?status=${encodeURIComponent(status)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Impossible de lister les demandes vendeur');
+  return res.json();
+}
+
+export async function approveSellerRequest(token: string, id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/seller-requests/${id}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Impossible d'approuver la demande");
+}
+
+export async function rejectSellerRequest(token: string, id: string, message?: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/admin/seller-requests/${id}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error('Impossible de rejeter la demande');
+}
+
+export async function upgradeToSeller(token: string): Promise<AuthUser> {
+  const res = await fetch(`${API_URL}/api/users/me/upgrade-to-seller`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || 'Impossible de passer en vendeur');
+  }
+  return res.json();
 }
 
 export interface AuthResponse {
@@ -30,7 +123,7 @@ export async function loginUser(params: { email: string; password: string }): Pr
   return res.json();
 }
 
-export async function registerUser(params: { name?: string; email: string; password: string }): Promise<AuthResponse> {
+export async function registerUser(params: { name?: string; email: string; password: string; role?: 'BUYER' | 'SELLER' }): Promise<AuthResponse> {
   const res = await fetch(`${API_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -175,4 +268,19 @@ export async function rejectProduct(id: string, token?: string): Promise<Product
   }
 
   return res.json();
+}
+
+export async function deleteProductAdmin(id: string, token?: string): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}/api/admin/products/${id}`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok && res.status !== 204) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error || "Erreur lors de la suppression de l'article");
+  }
 }

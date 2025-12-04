@@ -3,6 +3,7 @@ import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 import { ProductCard } from './ProductCard';
 import type { Product } from '../data/mockData';
 import { fetchProducts } from '../api/client';
+import { getImageUrl } from '../lib/getImageUrl';
 
 interface HomePageProps {
   onProductClick: (productId: string) => void;
@@ -103,7 +104,7 @@ export function HomePage({ onProductClick, onNavigateToCatalog }: HomePageProps)
               <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="aspect-[4/3] overflow-hidden">
                   <img
-                    src={product.image}
+                    src={getImageUrl(product.image)}
                     alt={product.title}
                     className="w-full h-full object-cover"
                   />

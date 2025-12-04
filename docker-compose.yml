@@ -9,9 +9,11 @@ services:
       - "4004:4003"
     environment:
       DATABASE_URL: "file:./dev.db"
-      JWT_SECRET: "dev_change_me"
-      STRIPE_SECRET_KEY: "sk_test_xxx"
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       FRONTEND_URL: "http://localhost:5173"
+    env_file:
+      - .env
     volumes:
       - ./backend/prisma:/app/prisma
     restart: unless-stopped

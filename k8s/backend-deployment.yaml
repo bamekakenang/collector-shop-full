@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector-backend
+  namespace: collector-shop
+  labels:
+    app: collector-backend
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector-backend
+  template:
+    metadata:
+      labels:
+        app: collector-backend
+        tier: backend
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: collector-shop-full-backend:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "4003"
+            - name: DATABASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config
+                  key: DATABASE_URL
+            - name: FRONTEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config
+                  key: FRONTEND_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: JWT_SECRET
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: collector-secrets
+                  key: STRIPE_SECRET_KEY
+          ports:
+            - name: http
+              containerPort: 4003
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/uploads
+      volumes:
+        - name: uploads
+          emptyDir: {}

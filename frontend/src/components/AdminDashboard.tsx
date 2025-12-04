@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Users, Package, AlertTriangle, TrendingUp, Plus, Trash2, Check, X as XIcon } from 'lucide-react';
+import { Users, Package, AlertTriangle, TrendingUp, Plus, Trash2, Check, X as XIcon, Shield } from 'lucide-react';
 import type { Product } from '../data/mockData';
 import { categories } from '../data/mockData';
-import { fetchProducts, approveProduct, rejectProduct } from '../api/client';
+import { getImageUrl } from '../lib/getImageUrl';
+import { fetchProducts, approveProduct, rejectProduct, deleteProductAdmin, listSellerRequests, approveSellerRequest, rejectSellerRequest, adminListUsers, adminSetUserRole } from '../api/client';
 import type { User } from '../App';
 
 interface AdminDashboardProps {
@@ -10,10 +11,15 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ user }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'categories' | 'fraud'>('overview');
+const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'users' | 'categories' | 'fraud' | 'seller-requests'>('overview');
   const [newCategory, setNewCategory] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+const [loading, setLoading] = useState(true);
+  const [sellerRequests, setSellerRequests] = useState<any[]>([]);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersFilter, setUsersFilter] = useState<'ALL' | 'BUYER' | 'SELLER' | 'ADMIN'>('ALL');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,10 +152,18 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
           </button>
 
           <button
-            onClick={() => setActiveTab('categories')}
-            className={`pb-4 border-b-2 transition-colors ${activeTab === 'categories' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+            onClick={() => {
+              setActiveTab('users');
+              if (!user?.token) return;
+              setUsersLoading(true);
+              adminListUsers(user.token)
+                .then(setUsers)
+                .catch(() => alert("Impossible de lister les utilisateurs"))
+                .finally(() => setUsersLoading(false));
+            }}
+            className={`pb-4 border-b-2 transition-colors ${activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
           >
-            Catégories
+            Utilisateurs
           </button>
 
           <button
@@ -159,6 +173,27 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
             Détection fraudes
           </button>
         </nav>
+      </div>
+
+      <div className="mb-6">
+        <button
+          onClick={async () => {
+            if (!user?.token) return;
+            setReqLoading(true);
+            try {
+              const list = await listSellerRequests(user.token, 'pending');
+              setSellerRequests(list);
+              setActiveTab('seller-requests');
+            } catch (e) {
+              alert("Impossible de charger les demandes vendeur");
+            } finally {
+              setReqLoading(false);
+            }
+          }}
+          className="text-sm text-indigo-600 hover:text-indigo-700"
+        >
+          Voir les demandes vendeur en attente
+        </button>
       </div>
 
       {activeTab === 'overview' && (
@@ -216,39 +251,73 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
 
       {activeTab === 'products' && (
         <div>
-          <h2 className="text-gray-900 mb-6">Articles en attente de validation</h2>
-          {pendingProducts.length > 0 ? (
+          <h2 className="text-gray-900 mb-6">Tous les articles ({totalProducts})</h2>
+          {products.length > 0 ? (
             <div className="space-y-4">
-              {pendingProducts.map(product => (
+              {products.map(product => (
                 <div key={product.id} className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex gap-4">
-                    <img src={product.image} alt={product.title} className="w-32 h-32 object-cover rounded-lg" />
+                    <img src={getImageUrl(product.image)} alt={product.title} className="w-32 h-32 object-cover rounded-lg" />
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h3 className="text-gray-900 mb-1">{product.title}</h3>
                           <p className="text-gray-600 mb-2 line-clamp-2">{product.description}</p>
-                          <div className="flex gap-4 text-gray-600">
+                          <div className="flex flex-wrap gap-4 text-gray-600">
                             <span>Prix: {product.price.toFixed(2)} €</span>
                             <span>Vendeur: {product.sellerName}</span>
                             <span>Catégorie: {product.category}</span>
+                            <span>
+                              Statut:
+                              <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                                product.status === 'available' ? 'bg-green-100 text-green-700' :
+                                product.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-200 text-gray-700'
+                              }`}>
+                                {product.status}
+                              </span>
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {product.status === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(product.id)}
+                              className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              <Check className="h-4 w-4" />
+                              Approuver
+                            </button>
+                            <button
+                              onClick={() => handleReject(product.id)}
+                              className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+                            >
+                              <XIcon className="h-4 w-4" />
+                              Rejeter
+                            </button>
+                          </>
+                        )}
                         <button
-                          onClick={() => handleApprove(product.id)}
-                          className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          <Check className="h-4 w-4" />
-                          Approuver
-                        </button>
-                        <button
-                          onClick={() => handleReject(product.id)}
+                          onClick={async () => {
+                            if (!user || user.role !== 'ADMIN') {
+                              alert('Accès réservé aux administrateurs');
+                              return;
+                            }
+                            if (!confirm('Supprimer définitivement cet article ?')) return;
+                            try {
+                              await deleteProductAdmin(product.id, user.token);
+                              setProducts(prev => prev.filter(p => p.id !== product.id));
+                            } catch (e) {
+                              console.error(e);
+                              alert("Erreur lors de la suppression de l'article");
+                            }
+                          }}
                           className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
                         >
-                          <XIcon className="h-4 w-4" />
-                          Rejeter
+                          <Trash2 className="h-4 w-4" />
+                          Supprimer
                         </button>
                       </div>
                     </div>
@@ -259,9 +328,106 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
           ) : (
             <div className="text-center py-16 bg-gray-50 rounded-lg">
               <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-gray-900 mb-2">Aucun article en attente</h3>
-              <p className="text-gray-600">Tous les articles ont été validés</p>
+              <h3 className="text-gray-900 mb-2">Aucun article</h3>
+              <p className="text-gray-600">La liste des articles est vide</p>
             </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-gray-900">Gestion des utilisateurs</h2>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-700">Filtrer:</label>
+              <select
+                value={usersFilter}
+                onChange={async (e) => {
+                  const v = e.target.value as any;
+                  setUsersFilter(v);
+                  if (!user?.token) return;
+                  setUsersLoading(true);
+                  try {
+                    const list = await adminListUsers(user.token, v === 'ALL' ? undefined : v);
+                    setUsers(list);
+                  } catch (e) {
+                    alert("Impossible de lister les utilisateurs");
+                  } finally {
+                    setUsersLoading(false);
+                  }
+                }}
+                className="px-2 py-1 border border-gray-300 rounded"
+              >
+                <option value="ALL">Tous</option>
+                <option value="BUYER">Acheteurs</option>
+                <option value="SELLER">Vendeurs</option>
+                <option value="ADMIN">Admins</option>
+              </select>
+            </div>
+          </div>
+
+          {usersLoading ? (
+            <p className="text-gray-600">Chargement...</p>
+          ) : users.length > 0 ? (
+            <div className="space-y-2">
+              {users.map((u) => (
+                <div key={u.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-gray-900">{u.name}</p>
+                      <p className="text-gray-600 text-sm">{u.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-1 rounded-full border border-gray-300 text-gray-700">{u.role}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          if (!user?.token) return;
+                          try {
+                            const updated = await adminSetUserRole(user.token, u.id, 'BUYER');
+                            setUsers(prev => prev.map(x => x.id === u.id ? updated : x));
+                          } catch {
+                            alert("Maj du rôle impossible");
+                          }
+                        }}
+                        className="px-3 py-1 text-xs rounded bg-white border border-gray-300 hover:bg-gray-50"
+                      >Acheteur</button>
+                      <button
+                        onClick={async () => {
+                          if (!user?.token) return;
+                          try {
+                            const updated = await adminSetUserRole(user.token, u.id, 'SELLER');
+                            setUsers(prev => prev.map(x => x.id === u.id ? updated : x));
+                          } catch {
+                            alert("Maj du rôle impossible");
+                          }
+                        }}
+                        className="px-3 py-1 text-xs rounded bg-white border border-gray-300 hover:bg-gray-50"
+                      >Vendeur</button>
+                      <button
+                        onClick={async () => {
+                          if (!user?.token) return;
+                          try {
+                            const updated = await adminSetUserRole(user.token, u.id, 'ADMIN');
+                            setUsers(prev => prev.map(x => x.id === u.id ? updated : x));
+                          } catch {
+                            alert("Maj du rôle impossible");
+                          }
+                        }}
+                        className="px-3 py-1 text-xs rounded bg-white border border-gray-300 hover:bg-gray-50"
+                      >Admin</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600">Aucun utilisateur</p>
           )}
         </div>
       )}
@@ -299,6 +465,59 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'seller-requests' && (
+        <div>
+          <h2 className="text-gray-900 mb-6">Demandes vendeur en attente</h2>
+          {reqLoading ? (
+            <p className="text-gray-600">Chargement...</p>
+          ) : sellerRequests.length > 0 ? (
+            <div className="space-y-3">
+              {sellerRequests.map((r) => (
+                <div key={r.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-900">{r.user?.name || r.user?.email}</p>
+                    <p className="text-gray-600 text-sm">{r.user?.email}</p>
+                    <p className="text-gray-500 text-xs">Demande du {new Date(r.createdAt).toLocaleString()}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        if (!user?.token) return;
+                        try {
+                          await approveSellerRequest(user.token!, r.id);
+                          setSellerRequests((prev) => prev.filter((x) => x.id !== r.id));
+                        } catch (e) {
+                          alert("Erreur lors de l'approbation");
+                        }
+                      }}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                    >
+                      Approuver
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!user?.token) return;
+                        try {
+                          await rejectSellerRequest(user.token!, r.id);
+                          setSellerRequests((prev) => prev.filter((x) => x.id !== r.id));
+                        } catch (e) {
+                          alert('Erreur lors du rejet');
+                        }
+                      }}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                    >
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600">Aucune demande en attente</p>
+          )}
         </div>
       )}
 

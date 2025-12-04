@@ -1,9 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:4003',
+      '/uploads': 'http://localhost:4003'
+    }
   }
 });

@@ -10,13 +10,15 @@ interface DashboardPageProps {
   onProductClick: (productId: string) => void;
   onOpenChat: () => void;
   onAddProduct: () => void;
+  onUpgradeToSeller: () => void;
 }
 
 export function DashboardPage({
   user,
   onProductClick,
   onOpenChat,
-  onAddProduct
+  onAddProduct,
+  onUpgradeToSeller,
 }: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<'my-products' | 'favorites' | 'orders'>('my-products');
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,13 +78,22 @@ export function DashboardPage({
             <MessageCircle className="h-5 w-5" />
             Contacter un acheteur
           </button>
-          <button
-            onClick={onAddProduct}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-            Vendre un article
-          </button>
+{user?.role === 'SELLER' ? (
+            <button
+              onClick={onAddProduct}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="h-5 w-5" />
+              Vendre un article
+            </button>
+          ) : user?.role === 'BUYER' ? (
+            <button
+              onClick={onUpgradeToSeller}
+              className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-black transition-colors"
+            >
+              Devenir vendeur
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -171,12 +182,21 @@ export function DashboardPage({
               <p className="text-gray-600 mb-4">
                 Commencez à vendre vos pièces de collection en quelques clics.
               </p>
-              <button
-                onClick={onAddProduct}
-                className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Vendre un article
-              </button>
+{user?.role === 'SELLER' ? (
+                <button
+                  onClick={onAddProduct}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Vendre un article
+                </button>
+              ) : user?.role === 'BUYER' ? (
+                <button
+                  onClick={onUpgradeToSeller}
+                  className="bg-gray-900 text-white px-6 py-2 rounded-lg hover:bg-black transition-colors"
+                >
+                  Devenir vendeur
+                </button>
+              ) : null}
             </div>
           )}
         </div>

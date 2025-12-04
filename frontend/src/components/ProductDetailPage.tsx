@@ -14,6 +14,7 @@ import {
 import type { User } from '../App';
 import type { Product } from '../data/mockData';
 import { fetchProductById, createCheckoutSession } from '../api/client';
+import { getImageUrl } from '../lib/getImageUrl';
 
 interface ProductDetailPageProps {
   productId: string | null;
@@ -145,9 +146,10 @@ export function ProductDetailPage({
     );
   }
 
-  const galleryImages = (product.images && Array.isArray(product.images) && product.images.length > 0)
+  const galleryImagesRaw = (product.images && Array.isArray(product.images) && product.images.length > 0)
     ? product.images
     : [product.image];
+  const galleryImages = galleryImagesRaw.map(getImageUrl);
 
   const mainImage = galleryImages[Math.min(selectedImageIndex, galleryImages.length - 1)];
 

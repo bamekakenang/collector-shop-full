@@ -11,6 +11,9 @@ RUN npm install
 # Copy the rest of the backend source
 COPY . .
 
+# Generate Prisma client (needed after schema changes)
+RUN npx prisma generate
+
 # Expose backend port
 EXPOSE 4003
 
