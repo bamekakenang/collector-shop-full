@@ -1,7 +1,9 @@
 import type { Product } from '../data/mockData';
 import type { ProductFormData } from '../components/AddProductModal';
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+// Normalize API base so that we never end up with /api/api/*
+const __RAW_API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+const API_URL = __RAW_API.endsWith('/api') ? __RAW_API.slice(0, -4) : __RAW_API;
 
 export interface AuthUser {
   id: string;
