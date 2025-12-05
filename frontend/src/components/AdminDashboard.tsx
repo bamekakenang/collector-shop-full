@@ -3,7 +3,7 @@ import { Users, Package, AlertTriangle, TrendingUp, Plus, Trash2, Check, X as XI
 import type { Product } from '../data/mockData';
 import { categories } from '../data/mockData';
 import { getImageUrl } from '../lib/getImageUrl';
-import { fetchProducts, approveProduct, rejectProduct, deleteProductAdmin, listSellerRequests, approveSellerRequest, rejectSellerRequest, adminListUsers, adminSetUserRole } from '../api/client';
+import { fetchProducts, approveProduct, rejectProduct, deleteProductAdmin, listSellerRequests, approveSellerRequest, rejectSellerRequest, adminListUsers, adminSetUserRole, adminSetUserActive } from '../api/client';
 import type { User } from '../App';
 
 interface AdminDashboardProps {
@@ -21,6 +21,7 @@ const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersFilter, setUsersFilter] = useState<'ALL' | 'BUYER' | 'SELLER' | 'ADMIN'>('ALL');
   const [error, setError] = useState<string | null>(null);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -38,7 +39,6 @@ const [loading, setLoading] = useState(true);
 
   const pendingProducts = products.filter(p => p.status === 'pending');
   const totalProducts = products.length;
-  const totalUsers = 156;
 
   const handleApprove = async (id: string) => {
     if (!user || user.role !== 'ADMIN') {
@@ -98,7 +98,7 @@ const [loading, setLoading] = useState(true);
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-600 mb-1">Utilisateurs</p>
-              <p className="text-gray-900">{totalUsers}</p>
+              <p className="text-gray-900">{totalUsers ?? '-'}</p>
             </div>
             <Users className="h-8 w-8 text-blue-600" />
           </div>
@@ -157,7 +157,10 @@ const [loading, setLoading] = useState(true);
               if (!user?.token) return;
               setUsersLoading(true);
               adminListUsers(user.token)
-                .then(setUsers)
+                .then((res) => {
+                  setUsers(res.items);
+                  setTotalUsers(res.total);
+                })
                 .catch(() => alert("Impossible de lister les utilisateurs"))
                 .finally(() => setUsersLoading(false));
             }}
@@ -349,8 +352,9 @@ const [loading, setLoading] = useState(true);
                   if (!user?.token) return;
                   setUsersLoading(true);
                   try {
-                    const list = await adminListUsers(user.token, v === 'ALL' ? undefined : v);
-                    setUsers(list);
+                    const res = await adminListUsers(user.token, v === 'ALL' ? undefined : v);
+                    setUsers(res.items);
+                    setTotalUsers(res.total);
                   } catch (e) {
                     alert("Impossible de lister les utilisateurs");
                   } finally {
@@ -380,10 +384,33 @@ const [loading, setLoading] = useState(true);
                     <div>
                       <p className="text-gray-900">{u.name}</p>
                       <p className="text-gray-600 text-sm">{u.email}</p>
+                      {(u.address || u.phone || u.gender) && (
+                        <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+                          {u.address && <p>Adresse : {u.address}</p>}
+                          {u.phone && <p>Tél. : {u.phone}</p>}
+                          {u.gender && (
+                            <p>
+                              Sexe :
+                              {u.gender === 'male'
+                                ? ' Homme'
+                                : u.gender === 'female'
+                                ? ' Femme'
+                                : ' Autre'}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs px-2 py-1 rounded-full border border-gray-300 text-gray-700">{u.role}</span>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full ${
+                        u.active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                      }`}
+                    >
+                      {u.active ? 'Actif' : 'En attente'}
+                    </span>
                     <div className="flex gap-2">
                       <button
                         onClick={async () => {
@@ -421,6 +448,18 @@ const [loading, setLoading] = useState(true);
                         }}
                         className="px-3 py-1 text-xs rounded bg-white border border-gray-300 hover:bg-gray-50"
                       >Admin</button>
+                      <button
+                        onClick={async () => {
+                          if (!user?.token) return;
+                          try {
+                            const updated = await adminSetUserActive(user.token, u.id, !u.active);
+                            setUsers(prev => prev.map(x => x.id === u.id ? updated : x));
+                          } catch {
+                            alert("Maj du statut impossible");
+                          }
+                        }}
+                        className="px-3 py-1 text-xs rounded bg-white border border-gray-300 hover:bg-gray-50"
+                      >{u.active ? 'Désactiver' : 'Activer'}</button>
                     </div>
                   </div>
                 </div>

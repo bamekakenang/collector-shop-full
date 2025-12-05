@@ -22,6 +22,10 @@ export interface User {
   role: UserRole;
   interests: string[];
   token?: string;
+  active?: boolean;
+  address?: string | null;
+  phone?: string | null;
+  gender?: string | null;
 }
 
 export interface CartItem {
@@ -51,19 +55,46 @@ function App() {
       role: apiUser.role as UserRole,
       interests: ['sneakers', 'star-wars', 'vintage-posters'],
       token,
+      active: apiUser.active,
+      address: apiUser.address ?? null,
+      phone: apiUser.phone ?? null,
+      gender: apiUser.gender ?? null,
     });
     setShowLoginModal(false);
   };
 
-  const handleRegister = async (name: string, email: string, password: string, role: 'BUYER' | 'SELLER') => {
-    const { user: apiUser, token } = await registerUser({ name, email, password, role });
+  const handleRegister = async (
+    name: string,
+    email: string,
+    password: string,
+    role: 'BUYER' | 'SELLER',
+    address?: string,
+    phone?: string,
+    gender?: string,
+  ) => {
+    const { user: apiUser, message } = await registerUser({ name, email, password, role, address, phone, gender });
+
+    // Tous les nouveaux comptes sont inactifs tant qu'un admin ne les a pas validés
+    if (!apiUser.active) {
+      alert(
+        message ||
+          "Votre compte a été créé et est en attente de validation par un administrateur. Vous pourrez vous connecter une fois votre compte activé.",
+      );
+      setShowSignUpModal(false);
+      return;
+    }
+
     setUser({
       id: apiUser.id,
       name: apiUser.name,
       email: apiUser.email,
       role: apiUser.role as UserRole,
       interests: ['sneakers', 'star-wars', 'vintage-posters'],
-      token,
+      token: undefined,
+      active: apiUser.active,
+      address: apiUser.address ?? null,
+      phone: apiUser.phone ?? null,
+      gender: apiUser.gender ?? null,
     });
     setShowSignUpModal(false);
   };

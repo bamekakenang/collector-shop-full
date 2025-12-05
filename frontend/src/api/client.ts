@@ -1,9 +1,34 @@
 import type { Product } from '../data/mockData';
 import type { ProductFormData } from '../components/AddProductModal';
 
-// Normalize API base so that we never end up with /api/api/*
-const __RAW_API = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
-const API_URL = __RAW_API.endsWith('/api') ? __RAW_API.slice(0, -4) : __RAW_API;
+// Helper pour construire les URLs d'API sans doubler "/api".
+// Principe :
+// - En dev / docker-compose, on passe une URL complète (ex: http://localhost:4004)
+//   et on joint le chemin REST dessus.
+// - En production Kubernetes, on ne définit PAS VITE_API_URL et on garde
+//   des chemins relatifs (ex: /api/products) qui sont proxyfiés par Nginx.
+const RAW_API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  if (RAW_API_BASE) {
+    try {
+      const u = new URL(RAW_API_BASE);
+      // Nettoie le trailing slash éventuel et concatène le chemin
+      const basePath = u.pathname.replace(/\/$/, '');
+      u.pathname = `${basePath}${normalizedPath}`;
+      return u.toString();
+    } catch {
+      // Si RAW_API_BASE n'est pas une URL absolue, on la traite comme préfixe de chemin
+      const base = RAW_API_BASE.replace(/\/$/, '');
+      return `${base}${normalizedPath}`;
+    }
+  }
+
+  // Aucun RAW_API_BASE : on utilise un chemin relatif (utile en Kube avec Nginx proxy /api)
+  return normalizedPath;
+}
 
 export interface AuthUser {
   id: string;
@@ -16,19 +41,28 @@ export interface AuthUser {
   gender?: string | null;
 }
 
-export interface AdminUserDTO { id: string; name: string; email: string; role: 'BUYER' | 'SELLER' | 'ADMIN' | string; active?: boolean }
+export interface AdminUserDTO {
+  id: string;
+  name: string;
+  email: string;
+  role: 'BUYER' | 'SELLER' | 'ADMIN' | string;
+  active?: boolean;
+  address?: string | null;
+  phone?: string | null;
+  gender?: string | null;
+}
 export async function adminListUsers(token: string, role?: string, q?: string, page: number = 1, pageSize: number = 10): Promise<{ total: number; page: number; pageSize: number; items: AdminUserDTO[] }> {
   const params = new URLSearchParams();
   if (role) params.set('role', role);
   if (q) params.set('q', q);
   if (page) params.set('page', String(page));
   if (pageSize) params.set('pageSize', String(pageSize));
-  const res = await fetch(`${API_URL}/api/admin/users?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(buildApiUrl(`/api/admin/users?${params.toString()}`), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error("Impossible de lister les utilisateurs");
   return res.json();
 }
 export async function adminSetUserRole(token: string, id: string, role: 'BUYER' | 'SELLER' | 'ADMIN'): Promise<AdminUserDTO> {
-  const res = await fetch(`${API_URL}/api/admin/users/${id}/role`, {
+  const res = await fetch(buildApiUrl(`/api/admin/users/${id}/role`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ role }),
@@ -41,7 +75,7 @@ export async function adminSetUserRole(token: string, id: string, role: 'BUYER' 
 }
 
 export async function adminSetUserActive(token: string, id: string, active: boolean): Promise<AdminUserDTO> {
-  const res = await fetch(`${API_URL}/api/admin/users/${id}/active`, {
+  const res = await fetch(buildApiUrl(`/api/admin/users/${id}/active`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ active }),
@@ -60,7 +94,7 @@ export interface SellerRequest {
 }
 
 export async function createSellerRequest(token: string, message?: string): Promise<SellerRequest> {
-  const res = await fetch(`${API_URL}/api/users/me/request-seller`, {
+  const res = await fetch(buildApiUrl('/api/users/me/request-seller'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ message }),
@@ -73,7 +107,7 @@ export async function createSellerRequest(token: string, message?: string): Prom
 }
 
 export async function listSellerRequests(token: string, status: string = 'pending'): Promise<SellerRequest[]> {
-  const res = await fetch(`${API_URL}/api/admin/seller-requests?status=${encodeURIComponent(status)}`, {
+  const res = await fetch(buildApiUrl(`/api/admin/seller-requests?status=${encodeURIComponent(status)}`), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('Impossible de lister les demandes vendeur');
@@ -81,7 +115,7 @@ export async function listSellerRequests(token: string, status: string = 'pendin
 }
 
 export async function approveSellerRequest(token: string, id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/seller-requests/${id}/approve`, {
+  const res = await fetch(buildApiUrl(`/api/admin/seller-requests/${id}/approve`), {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -89,7 +123,7 @@ export async function approveSellerRequest(token: string, id: string): Promise<v
 }
 
 export async function rejectSellerRequest(token: string, id: string, message?: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/admin/seller-requests/${id}/reject`, {
+  const res = await fetch(buildApiUrl(`/api/admin/seller-requests/${id}/reject`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify({ message }),
@@ -98,7 +132,7 @@ export async function rejectSellerRequest(token: string, id: string, message?: s
 }
 
 export async function upgradeToSeller(token: string): Promise<AuthUser> {
-  const res = await fetch(`${API_URL}/api/users/me/upgrade-to-seller`, {
+  const res = await fetch(buildApiUrl('/api/users/me/upgrade-to-seller'), {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -116,7 +150,7 @@ export interface AuthResponse {
 }
 
 export async function loginUser(params: { email: string; password: string }): Promise<AuthResponse> {
-  const res = await fetch(`${API_URL}/api/auth/login`, {
+  const res = await fetch(buildApiUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -131,7 +165,7 @@ export async function loginUser(params: { email: string; password: string }): Pr
 }
 
 export async function registerUser(params: { name?: string; email: string; password: string; role?: 'BUYER' | 'SELLER'; address?: string; phone?: string; gender?: string; sellerMessage?: string }): Promise<AuthResponse> {
-  const res = await fetch(`${API_URL}/api/auth/register`, {
+  const res = await fetch(buildApiUrl('/api/auth/register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -146,7 +180,7 @@ export async function registerUser(params: { name?: string; email: string; passw
 }
 
 export async function fetchProducts(): Promise<Product[]> {
-  const res = await fetch(`${API_URL}/api/products`);
+  const res = await fetch(buildApiUrl('/api/products'));
   if (!res.ok) {
     throw new Error('Erreur lors du chargement des produits');
   }
@@ -162,7 +196,7 @@ export async function fetchProducts(): Promise<Product[]> {
 }
 
 export async function fetchProductById(id: string): Promise<Product> {
-  const res = await fetch(`${API_URL}/api/products/${id}`);
+  const res = await fetch(buildApiUrl(`/api/products/${id}`));
   if (!res.ok) {
     throw new Error('Produit non trouvé');
   }
@@ -187,7 +221,7 @@ export async function uploadImage(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('image', file);
 
-  const res = await fetch(`${API_URL}/api/upload`, {
+  const res = await fetch(buildApiUrl('/api/upload'), {
     method: 'POST',
     body: formData,
   });
@@ -208,7 +242,7 @@ export async function createProduct(payload: CreateProductPayload, token?: strin
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}/api/products`, {
+  const res = await fetch(buildApiUrl('/api/products'), {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -227,7 +261,7 @@ export async function createCheckoutSession(productId: string, token: string, qu
     Authorization: `Bearer ${token}`,
   };
 
-  const res = await fetch(`${API_URL}/api/checkout/session`, {
+  const res = await fetch(buildApiUrl('/api/checkout/session'), {
     method: 'POST',
     headers,
     body: JSON.stringify({ productId, quantity }),
@@ -247,7 +281,7 @@ export async function approveProduct(id: string, token?: string): Promise<Produc
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}/api/admin/products/${id}/approve`, {
+  const res = await fetch(buildApiUrl(`/api/admin/products/${id}/approve`), {
     method: 'POST',
     headers,
   });
@@ -265,7 +299,7 @@ export async function rejectProduct(id: string, token?: string): Promise<Product
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}/api/admin/products/${id}/reject`, {
+  const res = await fetch(buildApiUrl(`/api/admin/products/${id}/reject`), {
     method: 'POST',
     headers,
   });
@@ -282,7 +316,7 @@ export async function deleteProductAdmin(id: string, token?: string): Promise<vo
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_URL}/api/admin/products/${id}`, {
+  const res = await fetch(buildApiUrl(`/api/admin/products/${id}`), {
     method: 'DELETE',
     headers,
   });

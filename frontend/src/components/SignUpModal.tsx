@@ -3,7 +3,15 @@ import { X } from 'lucide-react';
 
 interface SignUpModalProps {
   onClose: () => void;
-  onRegister: (name: string, email: string, password: string, role: 'BUYER' | 'SELLER') => Promise<void> | void;
+  onRegister: (
+    name: string,
+    email: string,
+    password: string,
+    role: 'BUYER' | 'SELLER',
+    address?: string,
+    phone?: string,
+    gender?: string,
+  ) => Promise<void> | void;
 }
 
 export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
@@ -11,6 +19,9 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'BUYER' | 'SELLER'>('BUYER');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +30,7 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
     setLoading(true);
     setError(null);
     try {
-      await onRegister(name, email, password, role);
+      await onRegister(name, email, password, role, address, phone, gender);
       onClose();
     } catch (err: any) {
       setError(err?.message || "Erreur lors de l'inscription");
@@ -72,6 +83,42 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
           </div>
 
           <div>
+            <label className="block text-gray-900 mb-1 text-sm">Adresse</label>
+            <input
+              type="text"
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="123 Rue de la Paix, Paris"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-900 mb-1 text-sm">Numéro de téléphone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="+33 6 12 34 56 78"
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-900 mb-1 text-sm">Sexe</label>
+            <select
+              value={gender}
+              onChange={e => setGender(e.target.value as 'male' | 'female' | 'other' | '')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">Sélectionner...</option>
+              <option value="male">Homme</option>
+              <option value="female">Femme</option>
+              <option value="other">Autre</option>
+            </select>
+          </div>
+
+          <div>
             <span className="block text-gray-900 mb-1 text-sm">Type de compte</span>
             <div className="flex items-center gap-4 text-sm">
               <label className="inline-flex items-center gap-2">
@@ -98,7 +145,7 @@ export function SignUpModal({ onClose, onRegister }: SignUpModalProps) {
           </button>
 
           <p className="text-gray-500 text-xs mt-2">
-            Vous pouvez vous inscrire en tant qu’acheteur ou vendeur. Les vendeurs peuvent publier des articles.
+            Votre compte sera soumis à validation par un administrateur avant d'être activé. Les vendeurs peuvent publier des articles après approbation.
           </p>
         </form>
       </div>

@@ -42,6 +42,14 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
 
+// Corrige les URLs de type /api/api/* en /api/* (double préfixe côté frontend)
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api/api/')) {
+    req.url = req.url.replace('/api/api/', '/api/');
+  }
+  next();
+});
+
 // Simple health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -71,9 +79,9 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
     // New policy: all new accounts are inactive until approved by an admin.
-    // Role is forced to BUYER on signup; seller access requires admin approval of a request.
+    // Le rôle demandé est enregistré (SELLER ou BUYER) mais le compte reste inactif tant qu'il n'est pas validé.
     const normalizedRole = typeof role === 'string' ? role.toUpperCase() : undefined;
-    const initialRole = normalizedRole === 'ADMIN' ? 'BUYER' : 'BUYER';
+    const initialRole = normalizedRole === 'SELLER' ? 'SELLER' : 'BUYER';
 
     const user = await prisma.user.create({
       data: {

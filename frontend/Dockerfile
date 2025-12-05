@@ -23,6 +23,9 @@ FROM nginx:alpine
 # Copy built assets into Nginx html directory
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Custom Nginx config: serve SPA + proxy /api vers le backend Kubernetes
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
