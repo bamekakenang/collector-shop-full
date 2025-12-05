@@ -22,6 +22,9 @@ RUN npm ci
 # Copy the rest of the backend source
 COPY . .
 
+# Provide a default SQLite URL for Prisma during image build
+ENV DATABASE_URL=file:./dev.db
+
 # Generate Prisma client (needed after schema changes)
 RUN npx prisma generate
 
