@@ -17,7 +17,10 @@ model User {
   email    String   @unique
   password String?
   role     String   // 'BUYER' | 'SELLER' | 'ADMIN'
-  active   Boolean  @default(true)
+  active   Boolean  @default(false)
+  address  String?
+  phone    String?
+  gender   String?  // 'male' | 'female' | 'other'
   orders   Order[]
   sellerRequest SellerRequest?
 }

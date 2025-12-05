@@ -50,7 +50,7 @@ app.get('/api/health', (req, res) => {
 // Auth routes
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, address, phone, gender, sellerMessage } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email et mot de passe sont obligatoires' });
     }
@@ -70,29 +70,46 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
+    // New policy: all new accounts are inactive until approved by an admin.
+    // Role is forced to BUYER on signup; seller access requires admin approval of a request.
     const normalizedRole = typeof role === 'string' ? role.toUpperCase() : undefined;
-    const allowedRoles = ['BUYER', 'SELLER', 'ADMIN'];
-    const safeRole = allowedRoles.includes(normalizedRole || '') ? normalizedRole : 'BUYER';
+    const initialRole = normalizedRole === 'ADMIN' ? 'BUYER' : 'BUYER';
 
     const user = await prisma.user.create({
       data: {
         name: name || email.split('@')[0],
         email,
         password: hash,
-        role: safeRole,
+        role: initialRole,
+        active: false,
+        address: address || null,
+        phone: phone || null,
+        gender: gender || null,
       },
     });
 
-    const token = signToken(user);
+    // If the client attempted to sign up as seller, open a seller request automatically
+    if (normalizedRole === 'SELLER') {
+      await prisma.sellerRequest.upsert({
+        where: { userId: user.id },
+        update: { status: 'pending', message: sellerMessage || null },
+        create: { userId: user.id, status: 'pending', message: sellerMessage || null },
+      });
+    }
 
     return res.status(201).json({
-      token,
+      // No token until approved to avoid active sessions on inactive accounts
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        active: user.active,
+        address: user.address,
+        phone: user.phone,
+        gender: user.gender,
       },
+      message: "Votre compte a été créé et est en attente de validation par un administrateur.",
     });
   } catch (err) {
     console.error(err);
@@ -117,6 +134,10 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
+    if (!user.active) {
+      return res.status(403).json({ error: 'Compte en attente de validation par un administrateur' });
+    }
+
     const token = signToken(user);
 
     return res.json({
@@ -126,6 +147,10 @@ app.post('/api/auth/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        active: user.active,
+        address: user.address,
+        phone: user.phone,
+        gender: user.gender,
       },
     });
   } catch (err) {
@@ -411,7 +436,7 @@ app.post('/api/admin/seller-requests/:id/approve', authMiddleware, requireRole('
     if (!request) return res.status(404).json({ error: 'Demande introuvable' });
     await prisma.$transaction([
       prisma.sellerRequest.update({ where: { id }, data: { status: 'approved' } }),
-      prisma.user.update({ where: { id: request.userId }, data: { role: 'SELLER' } }),
+      prisma.user.update({ where: { id: request.userId }, data: { role: 'SELLER', active: true } }),
     ]);
     return res.json({ ok: true });
   } catch (err) {
@@ -460,7 +485,7 @@ app.get('/api/admin/users', authMiddleware, requireRole('ADMIN'), async (req, re
       total,
       page,
       pageSize,
-      items: users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active })),
+      items: users.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, active: u.active, address: u.address, phone: u.phone, gender: u.gender })),
     });
   } catch (err) {
     console.error(err);
