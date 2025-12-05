@@ -8,6 +8,10 @@ export interface AuthUser {
   name: string;
   email: string;
   role: 'BUYER' | 'SELLER' | 'ADMIN' | string;
+  active?: boolean;
+  address?: string | null;
+  phone?: string | null;
+  gender?: string | null;
 }
 
 export interface AdminUserDTO { id: string; name: string; email: string; role: 'BUYER' | 'SELLER' | 'ADMIN' | string; active?: boolean }
@@ -104,8 +108,9 @@ export async function upgradeToSeller(token: string): Promise<AuthUser> {
 }
 
 export interface AuthResponse {
-  token: string;
+  token?: string;
   user: AuthUser;
+  message?: string;
 }
 
 export async function loginUser(params: { email: string; password: string }): Promise<AuthResponse> {
@@ -123,7 +128,7 @@ export async function loginUser(params: { email: string; password: string }): Pr
   return res.json();
 }
 
-export async function registerUser(params: { name?: string; email: string; password: string; role?: 'BUYER' | 'SELLER' }): Promise<AuthResponse> {
+export async function registerUser(params: { name?: string; email: string; password: string; role?: 'BUYER' | 'SELLER'; address?: string; phone?: string; gender?: string; sellerMessage?: string }): Promise<AuthResponse> {
   const res = await fetch(`${API_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
