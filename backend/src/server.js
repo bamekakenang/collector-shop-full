@@ -545,7 +545,17 @@ app.delete('/api/admin/products/:id', authMiddleware, requireRole('ADMIN'), asyn
   }
 });
 
-const PORT = process.env.PORT || 4003;
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+function start(port = process.env.PORT || 4003) {
+  const server = app.listen(port, () => {
+    const address = server.address();
+    const actualPort = typeof address === 'object' && address ? address.port : port;
+    console.log(`Backend running on http://localhost:${actualPort}`);
+  });
+  return server;
+}
+
+if (require.main === module) {
+  start();
+}
+
+module.exports = { app, start };
