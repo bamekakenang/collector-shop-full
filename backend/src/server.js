@@ -12,6 +12,7 @@ const stripe = process.env.STRIPE_SECRET_KEY
   : null;
 const { prisma } = require('./prisma');
 const { signToken, authMiddleware, requireRole } = require('./auth');
+const rabbitmq = require('./services/rabbitmq');
 
 const app = express();
 
@@ -229,6 +230,64 @@ app.post('/api/checkout/session', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Erreur lors de la création de la session de paiement' });
+  }
+});
+
+// Orders routes - Create order (simule succès paiement)
+app.post('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const { productId, quantity = 1 } = req.body;
+    if (!productId) {
+      return res.status(400).json({ error: 'productId requis' });
+    }
+
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product) {
+      return res.status(404).json({ error: 'Produit non trouvé' });
+    }
+
+    const totalPrice = (product.price + product.shipping) * quantity;
+
+    const order = await prisma.order.create({
+      data: {
+        productId: product.id,
+        buyerId: req.user.id,
+        totalPrice,
+        status: 'pending',
+      },
+    });
+
+    // Publier événement dans RabbitMQ
+    await rabbitmq.publish('order.created', {
+      orderId: order.id,
+      productId: product.id,
+      productTitle: product.title,
+      buyerId: req.user.id,
+      buyerEmail: req.user.email,
+      totalPrice,
+      quantity,
+      createdAt: order.createdAt.toISOString(),
+    });
+
+    res.status(201).json(order);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de la création de la commande' });
+  }
+});
+
+// Get user orders
+app.get('/api/orders', authMiddleware, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { buyerId: req.user.id },
+      include: { product: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(orders);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors du chargement des commandes' });
   }
 });
 
@@ -554,6 +613,46 @@ function start(port = process.env.PORT || 4003) {
     const actualPort = typeof address === 'object' && address ? address.port : port;
     console.log(`Backend running on http://localhost:${actualPort}`);
   });
+
+  // Démarrer le consumer RabbitMQ
+  rabbitmq.connect()
+    .then(() => {
+      // Consumer pour traiter les commandes
+      rabbitmq.consumeOrders(async (orderData) => {
+        console.log('✅ Traitement commande:', orderData.orderId);
+        // Ici tu peux ajouter la logique métier:
+        // - Envoyer email de confirmation
+        // - Mettre à jour le stock
+        // - Notifier le vendeur
+        // - etc.
+        
+        // Exemple: mettre à jour le statut de la commande
+        try {
+          await prisma.order.update({
+            where: { id: orderData.orderId },
+            data: { status: 'processing' },
+          });
+          console.log(`✅ Commande ${orderData.orderId} mise à jour: processing`);
+        } catch (error) {
+          console.error(`❌ Erreur mise à jour commande ${orderData.orderId}:`, error.message);
+        }
+      });
+    })
+    .catch(err => {
+      console.error('⚠️  RabbitMQ non disponible:', err.message);
+      console.log('➡️  Le serveur continue sans RabbitMQ');
+    });
+
+  // Fermeture propre
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM reçu, fermeture...');
+    await rabbitmq.close();
+    server.close(() => {
+      console.log('Serveur fermé');
+      process.exit(0);
+    });
+  });
+
   return server;
 }
 

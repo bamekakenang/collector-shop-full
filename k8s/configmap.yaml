@@ -8,3 +8,5 @@ data:
   DATABASE_URL: "file:./dev.db"
   # External frontend URL used by backend for Stripe redirects
   FRONTEND_URL: "http://localhost:30080"
+  # RabbitMQ connection URL
+  RABBITMQ_URL: "amqp://admin:admin123@rabbitmq.collector-shop.svc.cluster.local:5672"
