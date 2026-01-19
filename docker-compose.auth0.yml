@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: collector-backend-auth0
+    ports:
+      - "4004:4003"
+    environment:
+      DATABASE_URL: "file:./dev.db"
+      AUTH_PROVIDER: "auth0"
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN}
+      AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      FRONTEND_URL: "http://localhost:5173"
+    env_file:
+      - .env
+    volumes:
+      - ./backend/prisma:/app/prisma
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:4004
+        - VITE_AUTH_PROVIDER=auth0
+        - VITE_AUTH0_DOMAIN=${AUTH0_DOMAIN}
+        - VITE_AUTH0_CLIENT_ID=${AUTH0_FRONTEND_CLIENT_ID}
+        - VITE_AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+    container_name: collector-frontend-auth0
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+networks:
+  collector-network:
+    driver: bridge
