@@ -6,7 +6,10 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || '');
+// Initialize Stripe only if API key is provided
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? require('stripe')(process.env.STRIPE_SECRET_KEY)
+  : null;
 const { prisma } = require('./prisma');
 const { signToken, authMiddleware, requireRole } = require('./auth');
 
@@ -180,7 +183,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 // Stripe Checkout - single product
 app.post('/api/checkout/session', authMiddleware, async (req, res) => {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
+    if (!stripe) {
       return res.status(500).json({ error: 'Stripe n\'est pas configuré côté serveur' });
     }
 
