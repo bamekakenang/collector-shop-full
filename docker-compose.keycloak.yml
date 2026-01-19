@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  postgres-keycloak:
+    image: postgres:15
+    container_name: postgres-keycloak
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - postgres-keycloak-data:/var/lib/postgresql/data
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: keycloak
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres-keycloak
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: collector-backend-keycloak
+    ports:
+      - "4004:4003"
+    environment:
+      DATABASE_URL: "file:./dev.db"
+      AUTH_PROVIDER: "keycloak"
+      KEYCLOAK_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "collector-shop"
+      KEYCLOAK_CLIENT_ID: "collector-backend"
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      FRONTEND_URL: "http://localhost:5173"
+    env_file:
+      - .env
+    volumes:
+      - ./backend/prisma:/app/prisma
+    depends_on:
+      - keycloak
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:4004
+        - VITE_AUTH_PROVIDER=keycloak
+        - VITE_KEYCLOAK_URL=http://localhost:8080
+        - VITE_KEYCLOAK_REALM=collector-shop
+        - VITE_KEYCLOAK_CLIENT_ID=collector-frontend
+    container_name: collector-frontend-keycloak
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - collector-network
+    restart: unless-stopped
+
+networks:
+  collector-network:
+    driver: bridge
+
+volumes:
+  postgres-keycloak-data:
