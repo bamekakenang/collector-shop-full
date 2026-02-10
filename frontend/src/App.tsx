@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { CatalogPage } from './components/CatalogPage';
@@ -38,7 +38,11 @@ export type PageView = 'home' | 'catalog' | 'product' | 'dashboard' | 'admin';
 function App() {
   const [currentPage, setCurrentPage] = useState<PageView>('home');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    // Restaurer l'utilisateur depuis localStorage au chargement
+    const savedUser = localStorage.getItem('collector_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -48,7 +52,7 @@ function App() {
 
   const handleLogin = async (email: string, password: string) => {
     const { user: apiUser, token } = await loginUser({ email, password });
-    setUser({
+    const loggedInUser: User = {
       id: apiUser.id,
       name: apiUser.name,
       email: apiUser.email,
@@ -59,7 +63,9 @@ function App() {
       address: apiUser.address ?? null,
       phone: apiUser.phone ?? null,
       gender: apiUser.gender ?? null,
-    });
+    };
+    setUser(loggedInUser);
+    localStorage.setItem('collector_user', JSON.stringify(loggedInUser));
     setShowLoginModal(false);
   };
 
@@ -101,6 +107,7 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('collector_user');
     setCurrentPage('home');
   };
 

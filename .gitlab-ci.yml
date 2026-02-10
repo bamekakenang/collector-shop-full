@@ -1,0 +1,191 @@
+# =============================================================================
+# GitLab CI/CD Pipeline - Collector Shop
+# Équivalent du pipeline GitHub Actions (.github/workflows/ci.yml)
+# =============================================================================
+
+stages:
+  - test
+  - build
+  - scan
+  - push
+  - deploy
+
+variables:
+  REGISTRY: registry.gitlab.com
+  IMAGE_BACKEND: $CI_REGISTRY_IMAGE/backend
+  IMAGE_FRONTEND: $CI_REGISTRY_IMAGE/frontend
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+  NODE_VERSION: "20"
+
+# ---------- Cache global npm ----------
+.node_cache: &node_cache
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - backend/node_modules/
+      - frontend/node_modules/
+
+# =============================================================================
+# STAGE: test
+# =============================================================================
+
+backend:test:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  <<: *node_cache
+  variables:
+    DATABASE_URL: "file:./dev.db"
+  before_script:
+    - cd backend
+    - npm ci
+    - npx prisma generate
+  script:
+    - npm test
+    - npm audit --audit-level=high --omit=dev || true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+frontend:test:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  <<: *node_cache
+  before_script:
+    - cd frontend
+    - npm ci
+  script:
+    - npm run typecheck
+    - npm run build
+    - npm audit --audit-level=high --omit=dev || true
+  artifacts:
+    paths:
+      - frontend/dist/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+dependency:review:
+  stage: test
+  image: node:${NODE_VERSION}-alpine
+  script:
+    - cd backend && npm audit --json > ../backend-audit.json || true
+    - cd ../frontend && npm audit --json > ../frontend-audit.json || true
+  artifacts:
+    paths:
+      - backend-audit.json
+      - frontend-audit.json
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# =============================================================================
+# STAGE: build
+# =============================================================================
+
+build:images:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build -t $IMAGE_BACKEND:$IMAGE_TAG backend/
+    - docker build -t $IMAGE_FRONTEND:$IMAGE_TAG frontend/
+    - docker save $IMAGE_BACKEND:$IMAGE_TAG > backend-image.tar
+    - docker save $IMAGE_FRONTEND:$IMAGE_TAG > frontend-image.tar
+  artifacts:
+    paths:
+      - backend-image.tar
+      - frontend-image.tar
+    expire_in: 1 hour
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# =============================================================================
+# STAGE: scan (sécurité)
+# =============================================================================
+
+scan:backend:
+  stage: scan
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy image --input backend-image.tar
+        --format table
+        --vuln-type os,library
+        --severity CRITICAL,HIGH
+        --ignore-unfixed
+        --exit-code 0
+  dependencies:
+    - build:images
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+scan:frontend:
+  stage: scan
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy image --input frontend-image.tar
+        --format table
+        --vuln-type os,library
+        --severity CRITICAL,HIGH
+        --ignore-unfixed
+        --exit-code 0
+  dependencies:
+    - build:images
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# =============================================================================
+# STAGE: push (registre d'images)
+# =============================================================================
+
+push:images:
+  stage: push
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker load < backend-image.tar
+    - docker load < frontend-image.tar
+    - docker push $IMAGE_BACKEND:$IMAGE_TAG
+    - docker push $IMAGE_FRONTEND:$IMAGE_TAG
+  dependencies:
+    - build:images
+    - scan:backend
+    - scan:frontend
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# =============================================================================
+# STAGE: deploy (GitOps - mise à jour des manifests K8s)
+# =============================================================================
+
+deploy:update-manifests:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git sed
+  script:
+    - sed -i "s|image:.*backend:.*|image: $IMAGE_BACKEND:$IMAGE_TAG|" k8s/backend-deployment.yaml
+    - sed -i "s|image:.*frontend:.*|image: $IMAGE_FRONTEND:$IMAGE_TAG|" k8s/frontend-deployment.yaml
+    - git config user.name "gitlab-ci"
+    - git config user.email "ci@gitlab.com"
+    - git add k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
+    - git commit -m "chore: update image tags to $IMAGE_TAG [skip ci]" || echo "No changes"
+    - git push "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:main
+  dependencies:
+    - push:images
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
