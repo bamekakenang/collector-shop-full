@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/bamekakenang/collector-shop-full-frontend:a2c6d5f0e2877de80bc9e3e7fa61ce4b910ef7b5
+          image: ghcr.io/bamekakenang/collector-shop-full-frontend:2721decbe2f502bf3b298e8b5a355f5a4f4086b1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
