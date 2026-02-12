@@ -182,7 +182,7 @@ graph LR
     DEV["💻 DEVELOP<br/>───<br/>Code<br/>Code Review<br/>Lint / Format<br/>Commit + Push"]
     BUILD["🔨 BUILD<br/>───<br/>Compile Vite<br/>Docker images<br/>Artefacts"]
     TEST["🧪 TEST<br/>───<br/>Unit Jest<br/>Intégration<br/>Trivy Scan<br/>npm audit"]
-    DEPLOY["🚀 DEPLOY<br/>───<br/>Push Registry<br/>GitOps K8s<br/>AKS / ArgoCD"]
+    DEPLOY["🚀 DEPLOY<br/>───<br/>Push Registry<br/>GitOps K8s<br/>kubectl apply AKS"]
     MONITOR["📊 MONITOR<br/>───<br/>Health Checks<br/>Logs<br/>Alertes<br/>Métriques"]
     FEEDBACK["🔄 FEEDBACK<br/>───<br/>Rétrospective<br/>Post-mortem<br/>Amélioration"]
 
@@ -232,8 +232,8 @@ graph LR
 
     subgraph PushDeploy["🚀 Push + Deploy"]
         PushGHCR["Push GHCR<br/>backend:SHA<br/>frontend:SHA"]
-        GitOps["Update K8s<br/>manifests<br/>git commit + push"]
-        Argo["ArgoCD Sync<br/>→ AKS"]
+        GitOps["Update K8s<br/>manifests<br/>sed + git push"]
+        KubeDeploy["kubectl apply<br/>→ AKS"]
     end
 
     Push --> BackTest & FrontTest
@@ -241,7 +241,7 @@ graph LR
     BackTest & FrontTest --> DockerBuild
     DockerBuild --> TrivyBack & TrivyFront
     TrivyBack & TrivyFront --> PushGHCR
-    PushGHCR --> GitOps --> Argo
+    PushGHCR --> GitOps --> KubeDeploy
 
     style Trigger fill:#e3f2fd,stroke:#1976d2
     style TestStage fill:#e8f5e9,stroke:#388e3c
