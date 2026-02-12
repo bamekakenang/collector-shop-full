@@ -115,12 +115,7 @@ scan:backend:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
-    - trivy image --input backend-image.tar
-        --format table
-        --vuln-type os,library
-        --severity CRITICAL,HIGH
-        --ignore-unfixed
-        --exit-code 0
+    - trivy image --input backend-image.tar --format table --vuln-type os,library --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0
   dependencies:
     - build:images
   rules:
@@ -132,12 +127,7 @@ scan:frontend:
     name: aquasec/trivy:latest
     entrypoint: [""]
   script:
-    - trivy image --input frontend-image.tar
-        --format table
-        --vuln-type os,library
-        --severity CRITICAL,HIGH
-        --ignore-unfixed
-        --exit-code 0
+    - trivy image --input frontend-image.tar --format table --vuln-type os,library --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0
   dependencies:
     - build:images
   rules:
@@ -178,13 +168,13 @@ deploy:update-manifests:
   before_script:
     - apk add --no-cache git sed
   script:
-    - sed -i "s|image:.*backend:.*|image: $IMAGE_BACKEND:$IMAGE_TAG|" k8s/backend-deployment.yaml
-    - sed -i "s|image:.*frontend:.*|image: $IMAGE_FRONTEND:$IMAGE_TAG|" k8s/frontend-deployment.yaml
-    - git config user.name "gitlab-ci"
-    - git config user.email "ci@gitlab.com"
+    - 'sed -i "s|image:.*backend:.*|image: $IMAGE_BACKEND:$IMAGE_TAG|" k8s/backend-deployment.yaml'
+    - 'sed -i "s|image:.*frontend:.*|image: $IMAGE_FRONTEND:$IMAGE_TAG|" k8s/frontend-deployment.yaml'
+    - 'git config user.name "gitlab-ci"'
+    - 'git config user.email "ci@gitlab.com"'
     - git add k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
-    - git commit -m "chore: update image tags to $IMAGE_TAG [skip ci]" || echo "No changes"
-    - git push "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:main
+    - 'git commit -m "chore: update image tags to $IMAGE_TAG [skip ci]" || echo "No changes"'
+    - 'git push "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:main'
   dependencies:
     - push:images
   rules:
