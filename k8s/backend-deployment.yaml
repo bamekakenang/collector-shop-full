@@ -21,7 +21,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: backend
-          image: ghcr.io/bamekakenang/collector-shop-full-backend:26a81848b8f0d7276c2a329b8348bc3c6e2d1feb
+          image: ghcr.io/bamekakenang/collector-shop-full-backend:1ba36f46ce80d7f429fe1eca6788131cd2427af0
           imagePullPolicy: IfNotPresent
           env:
             - name: NODE_ENV
