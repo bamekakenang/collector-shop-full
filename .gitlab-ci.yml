@@ -165,6 +165,7 @@ push:images:
 deploy:update-manifests:
   stage: deploy
   image: alpine:latest
+  allow_failure: true
   before_script:
     - apk add --no-cache git sed
   script:
