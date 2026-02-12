@@ -8,62 +8,105 @@
 ```mermaid
 graph TB
     User["🌐 Utilisateur<br/>(Navigateur)"]
-    LB["☁️ Azure Load Balancer<br/>IP publique : port 80"]
+
+    subgraph CI_CD["⚡ CI/CD Pipelines"]
+        direction LR
+        GHA["🟣 GitHub Actions<br/>ci.yml"]
+        GLC["🟠 GitLab CI<br/>.gitlab-ci.yml"]
+    end
+
+    subgraph Registries["📦 Registres d'Images"]
+        direction LR
+        GHCR["📦 GHCR<br/>ghcr.io"]
+        GLR["📦 GitLab Registry<br/>registry.gitlab.com"]
+        ACR["📦 ACR Azure<br/>collectorshopbk.azurecr.io"]
+    end
 
     subgraph AKS["☸️ AKS Cluster — Namespace: collector-shop"]
         direction TB
 
+        ALB["☁️ Azure Load Balancer<br/>IP: 9.223.210.37"]
+
         subgraph FrontendPod["Frontend Pod"]
-            Nginx["🟢 Nginx — Reverse Proxy"]
-            React["⚛️ React 18 SPA<br/>TypeScript + Tailwind CSS"]
+            Nginx["🟢 Nginx<br/>Reverse Proxy"]
+            React["⚛️ React 18 SPA<br/>TypeScript + Vite<br/>Tailwind CSS"]
         end
 
         subgraph BackendPod["Backend Pod"]
-            Express["🟢 Node.js 20 + Express"]
-            Auth["🔐 JWT + bcrypt + RBAC"]
+            Express["🟢 Node.js 20<br/>Express 4"]
+            Auth["🔐 JWT + bcrypt<br/>RBAC Middleware"]
             PrismaC["📦 Prisma ORM"]
             RMQClient["🐰 amqplib"]
             StripeSDK["💳 Stripe SDK"]
-            MulUp["📸 Multer Upload"]
+            Multer["📸 Multer"]
         end
 
-        subgraph Data["Couche Données"]
-            SQLite[("🗄️ SQLite dev.db")]
+        subgraph DataPod["Couche Données"]
+            SQLite[("🗄️ SQLite<br/>dev.db")]
             RabbitMQ["🐰 RabbitMQ 3.13<br/>Exchange: collector-shop<br/>Queue: orders"]
         end
 
-        subgraph K8sConf["Objets K8s"]
+        subgraph K8sObjects["Objets Kubernetes"]
             CM["📋 ConfigMap"]
             Sec["🔑 Secrets"]
             NP["🛡️ NetworkPolicy"]
         end
     end
 
-    Stripe["💳 Stripe API<br/>(Externe — HTTPS)"]
-    ACR["📦 ACR<br/>collectorshopbk.azurecr.io"]
+    Stripe["💳 Stripe API<br/>(Externe)"]
 
-    User -->|HTTP| LB
-    LB -->|Port 80| Nginx
-    Nginx -->|"GET /"| React
-    Nginx -->|"/api/*"| Express
-    Express --> Auth
-    Express --> PrismaC
-    Express --> RMQClient
-    Express --> StripeSDK
-    Express --> MulUp
-    PrismaC --> SQLite
-    RMQClient --> RabbitMQ
-    StripeSDK -->|HTTPS| Stripe
-    ACR -.->|Pull images| FrontendPod
-    ACR -.->|Pull images| BackendPod
-    CM -.->|env| Express
-    Sec -.->|env| Express
+    subgraph Auth_Providers["🔐 Identity Providers"]
+        direction LR
+        KC["🔑 Keycloak 24<br/>Docker local<br/>Realm: collector-shop"]
+        A0["🔐 Auth0 SaaS<br/>Okta Cloud<br/>Tenant: dev-xxx.us.auth0.com"]
+    end
 
+    subgraph Repos["📂 Repositories"]
+        direction LR
+        GH["🐙 GitHub<br/>bamekakenang/collector-shop-full"]
+        GL["🦊 GitLab<br/>bamekakenang0-group/collector-shop-full"]
+    end
+
+    User -->|"HTTP TCP/80"| ALB
+    ALB -->|"HTTP TCP/80"| Nginx
+    Nginx -->|"GET / — HTTP/1.1"| React
+    Nginx -->|"Proxy /api/* — HTTP/1.1"| Express
+
+    Express -->|"Middleware"| Auth
+    Express -->|"Prisma Client — SQL"| PrismaC
+    Express -->|"amqplib"| RMQClient
+    Express -->|"stripe-node"| StripeSDK
+    Express -->|"multipart/form-data"| Multer
+    PrismaC -->|"SQLite — File I/O"| SQLite
+    RMQClient -->|"AMQP 0-9-1 TCP/5672"| RabbitMQ
+    StripeSDK -->|"HTTPS/TLS TCP/443"| Stripe
+
+    CM -.->|"env vars"| Express
+    Sec -.->|"env vars base64"| Express
+    NP -.->|"Calico rules"| BackendPod
+
+    GH -->|"Webhook HTTPS"| GHA
+    GL -->|"Webhook HTTPS"| GLC
+    GHA -->|"docker push HTTPS"| GHCR
+    GLC -->|"docker push HTTPS"| GLR
+    ACR -->|"docker pull HTTPS"| FrontendPod
+    ACR -->|"docker pull HTTPS"| BackendPod
+
+    GHA -->|"git push manifests K8s — HTTPS"| GH
+    GLC -->|"git push manifests K8s — HTTPS"| GL
+
+    KC -->|"OIDC / OAuth 2.0 HTTP/8180"| Express
+    A0 -->|"OIDC / OAuth 2.0 HTTPS/443"| Express
+
+    style CI_CD fill:#f3e5f5,stroke:#7b1fa2
+    style Registries fill:#e8eaf6,stroke:#3f51b5
     style AKS fill:#e8f4fd,stroke:#0078d4
     style FrontendPod fill:#d4edda,stroke:#28a745
     style BackendPod fill:#fff3cd,stroke:#ffc107
-    style Data fill:#f8d7da,stroke:#dc3545
-    style K8sConf fill:#e2e3e5,stroke:#6c757d
+    style DataPod fill:#f8d7da,stroke:#dc3545
+    style K8sObjects fill:#e2e3e5,stroke:#6c757d
+    style Auth_Providers fill:#fff9c4,stroke:#f9a825
+    style Repos fill:#e0f2f1,stroke:#00796b
 ```
 
 ---
