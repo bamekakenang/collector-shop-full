@@ -3,7 +3,63 @@
 
 ---
 
-## 1. Architecture Globale de l'Application
+## 1. Architecture Physique de l'Application (vue macroscopique)
+
+```mermaid
+graph TB
+    subgraph Utilisateurs["👥 Utilisateurs"]
+        Acheteur["Acheteur<br/>───<br/>Consulter le catalogue<br/>Passer commande<br/>Payer"]
+        Vendeur["Vendeur<br/>───<br/>Publier des produits<br/>Gérer son stock<br/>Suivre les ventes"]
+        Admin["Administrateur<br/>───<br/>Gérer les utilisateurs<br/>Valider les vendeurs<br/>Modérer les produits"]
+    end
+
+    subgraph Frontend["🖥️ Service de Présentation"]
+        UI["Interface Utilisateur Web<br/>───<br/>Catalogue produits<br/>Panier / Commande<br/>Espace vendeur<br/>Dashboard admin"]
+    end
+
+    subgraph Backend["⚙️ Service API Métier"]
+        direction TB
+        AuthModule["Module Authentification<br/>───<br/>Inscription / Connexion<br/>Gestion des rôles<br/>Contrôle d'accès"]
+        ProductModule["Module Produits<br/>───<br/>CRUD produits<br/>Catégorisation<br/>Upload images<br/>Historique des prix"]
+        OrderModule["Module Commandes<br/>───<br/>Création commande<br/>Suivi statut<br/>Calcul prix total"]
+        PaymentModule["Module Paiement<br/>───<br/>Initier le paiement<br/>Redirection prestataire<br/>Confirmation"]
+        SellerModule["Module Vendeur<br/>───<br/>Demande de rôle vendeur<br/>Validation par admin"]
+    end
+
+    subgraph Donnees["🗄️ Couche de Persistance"]
+        BDD[("Base de Données<br/>Relationnelle<br/>───<br/>Utilisateurs<br/>Produits<br/>Commandes<br/>Catégories<br/>Demandes vendeur")]
+    end
+
+    subgraph Messaging["📨 Couche de Messagerie"]
+        Broker["Broker de Messages<br/>───<br/>File d'attente commandes<br/>Traitement asynchrone<br/>Découplage producteur / consommateur"]
+    end
+
+    subgraph Externe["🌐 Services Externes"]
+        Paiement["Prestataire de Paiement<br/>───<br/>Traitement transactions<br/>Sécurisation CB"]
+        IdP["Serveur d'Autorisation<br/>───<br/>Authentification OIDC<br/>Gestion identités<br/>Émission de tokens"]
+    end
+
+    Acheteur & Vendeur & Admin -->|"Requêtes utilisateur"| UI
+    UI -->|"Appels API"| Backend
+    AuthModule -->|"Vérification identité"| IdP
+    ProductModule & OrderModule & SellerModule -->|"Lecture / Écriture"| BDD
+    OrderModule -->|"Publication événement<br/>commande créée"| Broker
+    Broker -->|"Consommation événement<br/>traitement asynchrone"| OrderModule
+    PaymentModule -->|"Initier transaction"| Paiement
+    Paiement -->|"Confirmation paiement"| PaymentModule
+    AuthModule -->|"Lecture / Écriture"| BDD
+
+    style Utilisateurs fill:#e3f2fd,stroke:#1565c0
+    style Frontend fill:#d4edda,stroke:#28a745
+    style Backend fill:#fff3cd,stroke:#ffc107
+    style Donnees fill:#f8d7da,stroke:#dc3545
+    style Messaging fill:#f3e5f5,stroke:#7b1fa2
+    style Externe fill:#e0f2f1,stroke:#00796b
+```
+
+---
+
+## 2. Architecture Technique Détaillée (avec technologies)
 
 ```mermaid
 graph TB
@@ -111,7 +167,7 @@ graph TB
 
 ---
 
-## 2. Modèle de Données (Prisma / SQLite)
+## 3. Modèle de Données (Prisma / SQLite)
 
 ```mermaid
 erDiagram
@@ -174,7 +230,7 @@ erDiagram
 
 ---
 
-## 3. Cycle de Vie Dev(Sec)Ops
+## 4. Cycle de Vie Dev(Sec)Ops
 
 ```mermaid
 graph LR
@@ -209,7 +265,7 @@ graph LR
 
 ---
 
-## 4. Pipeline CI/CD — GitHub Actions
+## 5. Pipeline CI/CD — GitHub Actions
 
 ```mermaid
 graph LR
@@ -251,7 +307,7 @@ graph LR
 
 ---
 
-## 5. Pipeline CI/CD — GitLab CI
+## 6. Pipeline CI/CD — GitLab CI
 
 ```mermaid
 graph LR
@@ -299,7 +355,7 @@ graph LR
 
 ---
 
-## 6. Comparaison GitHub Actions vs GitLab CI
+## 7. Comparaison GitHub Actions vs GitLab CI
 
 ```mermaid
 graph TB
@@ -337,7 +393,7 @@ graph TB
 
 ---
 
-## 7. Architecture Kubernetes — Composants AKS
+## 8. Architecture Kubernetes — Composants AKS
 
 ```mermaid
 graph TB
@@ -391,7 +447,7 @@ graph TB
 
 ---
 
-## 8. Métiers Impliqués et Interactions
+## 9. Métiers Impliqués et Interactions
 
 ```mermaid
 graph TB
@@ -425,7 +481,7 @@ graph TB
 
 ---
 
-## 9. Stratégie de Tests dans le Pipeline
+## 10. Stratégie de Tests dans le Pipeline
 
 ```mermaid
 graph LR
@@ -472,7 +528,7 @@ graph LR
 
 ---
 
-## 10. Analyse des Risques et Mitigations
+## 11. Analyse des Risques et Mitigations
 
 ```mermaid
 graph TB
@@ -513,7 +569,7 @@ graph TB
 
 ---
 
-## 11. Gestion des Incidents
+## 12. Gestion des Incidents
 
 ```mermaid
 graph LR
@@ -537,7 +593,7 @@ graph LR
 
 ---
 
-## 12. Amélioration Continue Sécurité
+## 13. Amélioration Continue Sécurité
 
 ```mermaid
 graph TB
@@ -563,7 +619,7 @@ graph TB
 
 ---
 
-## 13. Flux de Communication (Sequence)
+## 14. Flux de Communication (Sequence)
 
 ```mermaid
 sequenceDiagram
@@ -610,7 +666,7 @@ sequenceDiagram
 
 ---
 
-## 14. Comparaison Keycloak vs Auth0
+## 15. Comparaison Keycloak vs Auth0
 
 ```mermaid
 graph TB
