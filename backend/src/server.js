@@ -177,7 +177,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
     return res.status(400).json({ error: 'Aucun fichier envoyé' });
   }
 
-  const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  const url = `/uploads/${req.file.filename}`;
   res.status(201).json({ url });
 });
 
