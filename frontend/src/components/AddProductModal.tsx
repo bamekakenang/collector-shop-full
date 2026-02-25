@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { X, Upload } from 'lucide-react';
 import { categories } from '../data/mockData';
 import { uploadImage } from '../api/client';
+import { getImageUrl } from '../lib/getImageUrl';
 
 interface AddProductModalProps {
   onClose: () => void;
@@ -145,7 +146,7 @@ export function AddProductModal({ onClose, onSubmit }: AddProductModalProps) {
             <div className="grid grid-cols-4 gap-4 mb-4">
               {formData.images.map((img, index) => (
                 <div key={index} className="relative">
-                  <img src={img} alt={`Product ${index + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                  <img src={getImageUrl(img)} alt={`Product ${index + 1}`} className="w-full h-24 object-cover rounded-lg" />
                   <button
                     type="button"
                     onClick={() => removeImage(index)}

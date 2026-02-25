@@ -1,5 +1,6 @@
 import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import type { CartItem, User } from '../App';
+import { getImageUrl } from '../lib/getImageUrl';
 
 interface CartDrawerProps {
   cart: CartItem[];
@@ -66,7 +67,7 @@ export function CartDrawer({
               {cart.map(item => (
                 <div key={item.product.id} className="bg-gray-50 rounded-lg p-4 flex gap-4">
                   <img
-                    src={item.product.image}
+                    src={getImageUrl(item.product.image)}
                     alt={item.product.title}
                     className="w-20 h-20 object-cover rounded-lg"
                   />
