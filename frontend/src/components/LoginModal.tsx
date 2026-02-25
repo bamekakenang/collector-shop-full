@@ -7,8 +7,8 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ onClose, onLogin }: LoginModalProps) {
-  const [email, setEmail] = useState('buyer@example.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,12 +71,6 @@ export function LoginModal({ onClose, onLogin }: LoginModalProps) {
             {loading ? 'Connexion...' : 'Se connecter'}
           </button>
 
-          <p className="text-gray-500 text-xs mt-2">
-            Comptes de démo :
-            <br />- buyer@example.com / password123 (acheteur)
-            <br />- seller@example.com / password123 (vendeur)
-            <br />- admin@example.com / password123 (admin)
-          </p>
         </form>
       </div>
     </div>
