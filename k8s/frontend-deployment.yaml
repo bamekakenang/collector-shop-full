@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: registry.gitlab.com/bamekakenang0-group/collector-shop-full/frontend:a3dd837d
+          image: registry.gitlab.com/bamekakenang0-group/collector-shop-full/frontend:49dbfd87
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
