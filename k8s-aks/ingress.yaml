@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: collector-ingress
+  namespace: collector-shop
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - collector-shop.swedencentral.cloudapp.azure.com
+      secretName: collector-tls
+  rules:
+    - host: collector-shop.swedencentral.cloudapp.azure.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-backend
+                port:
+                  number: 4003
+          - path: /uploads
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-backend
+                port:
+                  number: 4003
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: collector-frontend
+                port:
+                  number: 80

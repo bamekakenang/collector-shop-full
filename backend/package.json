@@ -9,7 +9,8 @@
     "fix:images": "node scripts/fix-image-urls.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "jest --runInBand tests/unit",
-    "test:integration": "node scripts/test-integration.js"
+    "test:integration": "jest --runInBand tests/integration --testTimeout=30000",
+    "test:integration:legacy": "node scripts/test-integration.js"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
